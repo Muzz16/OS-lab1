@@ -23,6 +23,7 @@
 #include <string.h>
 #include <readline/readline.h>
 #include <readline/history.h>
+#include <sys/wait>
 
 // The <unistd.h> header is your gateway to the OS's process management facilities.
 #include <unistd.h>
@@ -32,6 +33,7 @@
 static void print_cmd(Command *cmd);
 static void print_pgm(Pgm *p);
 void stripwhite(char *);
+void basic_commands(char **argv);
 
 int main(void)
 {
@@ -39,6 +41,11 @@ int main(void)
   {
     char *line;
     line = readline("> ");
+
+    if(line == NULL){
+      printf("EOF\n");
+      break;
+    }
 
     // Remove leading and trailing whitespace from the line
     stripwhite(line);
@@ -53,6 +60,12 @@ int main(void)
       {
         // Just prints cmd
         print_cmd(&cmd);
+
+        Pgm *p = cmd.pgm;
+        while(p != NULL){
+          basic_commands(p->pgmlist);
+          p = p->next;
+        }
       }
       else
       {
@@ -65,6 +78,25 @@ int main(void)
   }
 
   return 0;
+}
+
+void basic_commands(char **argv){
+  pid_t pid = fork();
+
+  if(pid <0){
+    perror("fork failed");
+  }
+
+  if(pid == 0){
+    if(execvp(argv[0],argv) == -1){
+      perror("execvp failed");
+      exit(EXIT_FAILURE);
+    }
+  }
+  else{
+    int status;
+    wait(&status);
+  }
 }
 
 /*
