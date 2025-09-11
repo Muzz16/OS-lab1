@@ -23,7 +23,7 @@
 #include <string.h>
 #include <readline/readline.h>
 #include <readline/history.h>
-#include <sys/wait>
+#include <sys/wait.h>
 
 // The <unistd.h> header is your gateway to the OS's process management facilities.
 #include <unistd.h>
