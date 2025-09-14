@@ -25,6 +25,7 @@
 #include <readline/history.h>
 #include <sys/wait.h>
 #include <stdbool.h>
+#include <signal.h>
 
 // The <unistd.h> header is your gateway to the OS's process management facilities.
 #include <unistd.h>
@@ -43,9 +44,13 @@ static void print_pgm(Pgm *p);
 void stripwhite(char *);
 void basic_commands(char **argv);
 void run_prgm(Pgm *p, bool connect_pipe);
+void handle_sigint(int sig);
 
 int main(void)
 {
+  // Setup functions for signals
+  signal(SIGINT, *handle_sigint);
+
   for (;;)
   {
     char *line;
@@ -83,12 +88,6 @@ int main(void)
           int status;
           wait(&status);
         }
-
-        //Pgm *p = cmd.pgm;
-        //while(p != NULL){
-        //  basic_commands(p->pgmlist);
-        //  p = p->next;
-        //}
       }
       else
       {
@@ -99,10 +98,18 @@ int main(void)
     // Clear memory
     free(line);
   }
+  
+  // Maybe wait for every child process here in case there are ones
+  // Or send a signal to terminate all of them
 
   return 0;
 }
 
+/*
+ * Run a certain program
+ *
+ * This function runs in recursion since the order of the programs are in reverse
+ */
 void run_prgm(Pgm *p, bool connect_pipe) {
   // Run until p becomes null in reverse order like the print function works
   if(p == NULL) {
@@ -167,6 +174,10 @@ void basic_commands(char **argv){
       exit(EXIT_FAILURE);
     }
   }
+}
+
+void handle_sigint(int sig) {
+  printf("CTRL+C entered!\n");
 }
 
 /*
