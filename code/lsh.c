@@ -30,10 +30,18 @@
 
 #include "parse.h"
 
+#define PIPE_READ 0
+#define PIPE_WRITE 1
+
+#define STDIN_FD 0
+#define STDOUT_FD 1
+#define STDERR_FD 2
+
 static void print_cmd(Command *cmd);
 static void print_pgm(Pgm *p);
 void stripwhite(char *);
 void basic_commands(char **argv);
+void run_prgm(Pgm *p);
 
 int main(void)
 {
@@ -60,12 +68,26 @@ int main(void)
       {
         // Just prints cmd
         print_cmd(&cmd);
-
-        Pgm *p = cmd.pgm;
-        while(p != NULL){
-          basic_commands(p->pgmlist);
-          p = p->next;
+        
+        pid_t pid = fork();
+        if(pid < 0) {
+          perror("fork failed");
         }
+        else if(pid == 0) {
+          run_prgm(cmd.pgm);
+        }
+        else {
+          // Check if this is supposed to be a background process or not
+          
+          int status;
+          wait(&status);
+        }
+
+        //Pgm *p = cmd.pgm;
+        //while(p != NULL){
+        //  basic_commands(p->pgmlist);
+        //  p = p->next;
+        //}
       }
       else
       {
@@ -78,6 +100,53 @@ int main(void)
   }
 
   return 0;
+}
+
+void run_prgm(Pgm *p) {
+  // Run until p becomes null in reverse order like the print function works
+  if(p == NULL) {
+    return;
+  }
+  else {
+    int fd[2];
+
+    if(pipe(fd) == -1) {
+      perror("pipe failed");
+    }
+
+    pid_t pid = fork();
+
+    if(pid < 0) {
+      perror("Fork failed!");
+    }
+    else if(pid == 0) {
+      // This is the child
+      close(fd[PIPE_READ]);
+      if(dup2(fd[PIPE_WRITE], STDOUT_FD) == -1)
+        perror("dup2 error in child");
+
+      // Run the program before execvp since the list of programs are in reverse order
+      run_prgm(p->next);
+      
+      char** argv = p->pgmlist;
+      if(execvp(argv[0], argv) == -1) {
+        perror("execvp failed");
+        exit(EXIT_FAILURE);
+      }
+      // The above exec should have ended here
+    }
+    else {
+      // This is the parent
+      // Wait or do something else if it's supposed to be a background process
+      
+      close(fd[PIPE_WRITE]);
+      if(dup2(fd[PIPE_READ], STDIN_FD) == -1)
+        perror("dup2 error in parent");
+
+      int status;
+      wait(&status);
+    }
+  }
 }
 
 void basic_commands(char **argv){
