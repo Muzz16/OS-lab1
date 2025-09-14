@@ -24,6 +24,7 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 #include <sys/wait.h>
+#include <stdbool.h>
 
 // The <unistd.h> header is your gateway to the OS's process management facilities.
 #include <unistd.h>
@@ -41,7 +42,7 @@ static void print_cmd(Command *cmd);
 static void print_pgm(Pgm *p);
 void stripwhite(char *);
 void basic_commands(char **argv);
-void run_prgm(Pgm *p);
+void run_prgm(Pgm *p, bool connect_pipe);
 
 int main(void)
 {
@@ -74,7 +75,7 @@ int main(void)
           perror("fork failed");
         }
         else if(pid == 0) {
-          run_prgm(cmd.pgm);
+          run_prgm(cmd.pgm, false);
         }
         else {
           // Check if this is supposed to be a background process or not
@@ -102,7 +103,7 @@ int main(void)
   return 0;
 }
 
-void run_prgm(Pgm *p) {
+void run_prgm(Pgm *p, bool connect_pipe) {
   // Run until p becomes null in reverse order like the print function works
   if(p == NULL) {
     return;
@@ -110,7 +111,7 @@ void run_prgm(Pgm *p) {
   else {
     int fd[2];
 
-    if(pipe(fd) == -1) {
+    if(connect_pipe && pipe(fd) == -1) {
       perror("pipe failed");
     }
 
@@ -121,12 +122,13 @@ void run_prgm(Pgm *p) {
     }
     else if(pid == 0) {
       // This is the child
-      close(fd[PIPE_READ]);
-      if(dup2(fd[PIPE_WRITE], STDOUT_FD) == -1)
-        perror("dup2 error in child");
-
+      if(connect_pipe) {
+        close(fd[PIPE_READ]);
+        if(dup2(fd[PIPE_WRITE], STDOUT_FD) == -1)
+          perror("dup2 error in child");
+      }
       // Run the program before execvp since the list of programs are in reverse order
-      run_prgm(p->next);
+      run_prgm(p->next, true);
       
       char** argv = p->pgmlist;
       if(execvp(argv[0], argv) == -1) {
@@ -138,11 +140,11 @@ void run_prgm(Pgm *p) {
     else {
       // This is the parent
       // Wait or do something else if it's supposed to be a background process
-      
-      close(fd[PIPE_WRITE]);
-      if(dup2(fd[PIPE_READ], STDIN_FD) == -1)
-        perror("dup2 error in parent");
-
+      if(connect_pipe) {
+        close(fd[PIPE_WRITE]);
+        if(dup2(fd[PIPE_READ], STDIN_FD) == -1)
+          perror("dup2 error in parent");
+      }
       int status;
       wait(&status);
     }
