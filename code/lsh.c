@@ -131,10 +131,7 @@ void run_prgm(Pgm *p, bool connect_pipe) {
       run_prgm(p->next, true);
       
       char** argv = p->pgmlist;
-      if(execvp(argv[0], argv) == -1) {
-        perror("execvp failed");
-        exit(EXIT_FAILURE);
-      }
+      basic_commands(argv);
       // The above exec should have ended here
     }
     else {
@@ -152,21 +149,23 @@ void run_prgm(Pgm *p, bool connect_pipe) {
 }
 
 void basic_commands(char **argv){
-  pid_t pid = fork();
-
-  if(pid <0){
-    perror("fork failed");
+  if(strcmp(argv[0], "cd") == 0) {
+    // Do cd stuff
+    // Check the standard input for input of directory
+    // Check if there is either a standard input or a second argument to this command
+    // Change directory or print out an error
+    
   }
-
-  if(pid == 0){
+  else if(strcmp(argv[0], "exit") == 0) {
+    // Do exit stuff
+    // Propably send SIGINT signal to the shell somehow
+    
+  }
+  else {
     if(execvp(argv[0],argv) == -1){
       perror("execvp failed");
       exit(EXIT_FAILURE);
     }
-  }
-  else{
-    int status;
-    wait(&status);
   }
 }
 
