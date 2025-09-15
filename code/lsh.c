@@ -39,18 +39,23 @@
 #define STDOUT_FD 1
 #define STDERR_FD 2
 
+/* FLAGS FOR RUNNING THE PROGRAM */
+#define FLAG_NONE 0
+#define FLAG_BACKGROUND 1
+#define FLAG_CONNECT_PIPE 2
+
 static void print_cmd(Command *cmd);
 static void print_pgm(Pgm *p);
 void stripwhite(char *);
 void basic_commands(char **argv);
-void run_prgm(Pgm *p, bool connect_pipe, int* get_child_pid);
+void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags);
 void handle_sigint(int sig);
+
+int child_pid;
 
 int main(void)
 {
   signal(SIGINT, *handle_sigint);
-  
-  int child_pid;
 
   for (;;)
   {
@@ -76,8 +81,7 @@ int main(void)
         // Just prints cmd
         print_cmd(&cmd);
       
-        run_prgm(cmd.pgm, false, &child_pid);
-
+        run_prgm(cmd.pgm, &child_pid, cmd.background ? FLAG_BACKGROUND : FLAG_NONE);
       }
       else
       {
@@ -100,13 +104,15 @@ int main(void)
  *
  * This function runs in recursion since the order of the programs are in reverse
  */
-void run_prgm(Pgm *p, bool connect_pipe, int* get_child_pid) {
+void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags) {
   // Run until p becomes null in reverse order like the print function works
   if(p == NULL) {
     return;
   }
   else {
     int fd[2];
+    
+    bool connect_pipe = flags & FLAG_CONNECT_PIPE;
 
     if(connect_pipe && pipe(fd) == -1) {
       perror("pipe failed");
@@ -125,13 +131,14 @@ void run_prgm(Pgm *p, bool connect_pipe, int* get_child_pid) {
           perror("dup2 error in child");
       }
       // Run the program before execvp since the list of programs are in reverse order
-      run_prgm(p->next, true, NULL);
+      run_prgm(p->next, NULL, FLAG_CONNECT_PIPE);
       
       char** argv = p->pgmlist;
       basic_commands(argv);
-      // The above exec should have ended here
     }
     else {
+      bool is_background = flags & FLAG_BACKGROUND;
+
       // This is the parent
       // Wait or do something else if it's supposed to be a background process
       if(connect_pipe) {
@@ -173,7 +180,8 @@ void basic_commands(char **argv){
 }
 
 void handle_sigint(int sig) {
-  printf("CTRL+C entered!\n");
+  printf("\nCTRL+C entered!\n");
+  kill(child_pid, SIGINT);
 }
 
 /*
