@@ -26,6 +26,7 @@
 #include <sys/wait.h>
 #include <stdbool.h>
 #include <signal.h>
+#include <unistd.h>
 
 // The <unistd.h> header is your gateway to the OS's process management facilities.
 #include <unistd.h>
@@ -48,7 +49,7 @@ static void print_cmd(Command *cmd);
 static void print_pgm(Pgm *p);
 void stripwhite(char *);
 void basic_commands(char **argv);
-void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags);
+void run_prgm(Pgm *p, int* get_child_pid, int parent_pid, unsigned char flags);
 void handle_sigint(int sig);
 
 int child_pid;
@@ -81,7 +82,7 @@ int main(void)
         // Just prints cmd
         print_cmd(&cmd);
       
-        run_prgm(cmd.pgm, &child_pid, cmd.background ? FLAG_BACKGROUND : FLAG_NONE);
+        run_prgm(cmd.pgm, &child_pid, getpid(), cmd.background ? FLAG_BACKGROUND : FLAG_NONE);
       }
       else
       {
@@ -96,6 +97,8 @@ int main(void)
   // Maybe wait for every child process here in case there are ones
   // Or send a signal to terminate all of them
 
+  wait(NULL);
+
   return 0;
 }
 
@@ -104,13 +107,15 @@ int main(void)
  *
  * This function runs in recursion since the order of the programs are in reverse
  */
-void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags) {
+void run_prgm(Pgm *p, int* get_child_pid, int parent_pid, unsigned char flags) {
   // Run until p becomes null in reverse order like the print function works
   if(p == NULL) {
     return;
   }
   else {
     int fd[2];
+
+    int parent_pid = getpid();
     
     bool connect_pipe = flags & FLAG_CONNECT_PIPE;
 
@@ -131,10 +136,28 @@ void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags) {
           perror("dup2 error in child");
       }
       // Run the program before execvp since the list of programs are in reverse order
-      run_prgm(p->next, NULL, FLAG_CONNECT_PIPE);
+      run_prgm(p->next, NULL, parent_pid, FLAG_CONNECT_PIPE);
       
       char** argv = p->pgmlist;
-      basic_commands(argv);
+
+      if(strcmp(argv[0], "cd") == 0) {
+        // Do cd stuff
+        // Check the standard input for input of directory
+        // Check if there is either a standard input or a second argument to this command
+        // Change directory or print out an error
+        
+      }
+      else if(strcmp(argv[0], "exit") == 0) {
+        // Do exit stuff
+        // Propably send SIGINT signal to the shell somehow
+        
+      }
+      else {
+        if(execvp(argv[0],argv) == -1){
+          perror("execvp failed");
+          exit(EXIT_FAILURE);
+        }
+      }
     }
     else {
       bool is_background = flags & FLAG_BACKGROUND;
@@ -151,30 +174,14 @@ void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags) {
       if(get_child_pid != NULL) {
         *get_child_pid = pid;
       }
-
-      int status;
-      wait(&status);
-    }
-  }
-}
-
-void basic_commands(char **argv){
-  if(strcmp(argv[0], "cd") == 0) {
-    // Do cd stuff
-    // Check the standard input for input of directory
-    // Check if there is either a standard input or a second argument to this command
-    // Change directory or print out an error
-    
-  }
-  else if(strcmp(argv[0], "exit") == 0) {
-    // Do exit stuff
-    // Propably send SIGINT signal to the shell somehow
-    
-  }
-  else {
-    if(execvp(argv[0],argv) == -1){
-      perror("execvp failed");
-      exit(EXIT_FAILURE);
+      
+      if(is_background) {
+        
+      }
+      else {
+        int status;
+        wait(&status);
+      }
     }
   }
 }
