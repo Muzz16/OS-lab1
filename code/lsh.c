@@ -43,13 +43,14 @@ static void print_cmd(Command *cmd);
 static void print_pgm(Pgm *p);
 void stripwhite(char *);
 void basic_commands(char **argv);
-void run_prgm(Pgm *p, bool connect_pipe);
+void run_prgm(Pgm *p, bool connect_pipe, int* get_child_pid);
 void handle_sigint(int sig);
 
 int main(void)
 {
-  // Setup functions for signals
   signal(SIGINT, *handle_sigint);
+  
+  int child_pid;
 
   for (;;)
   {
@@ -74,20 +75,9 @@ int main(void)
       {
         // Just prints cmd
         print_cmd(&cmd);
-        
-        pid_t pid = fork();
-        if(pid < 0) {
-          perror("fork failed");
-        }
-        else if(pid == 0) {
-          run_prgm(cmd.pgm, false);
-        }
-        else {
-          // Check if this is supposed to be a background process or not
-          
-          int status;
-          wait(&status);
-        }
+      
+        run_prgm(cmd.pgm, false, &child_pid);
+
       }
       else
       {
@@ -110,7 +100,7 @@ int main(void)
  *
  * This function runs in recursion since the order of the programs are in reverse
  */
-void run_prgm(Pgm *p, bool connect_pipe) {
+void run_prgm(Pgm *p, bool connect_pipe, int* get_child_pid) {
   // Run until p becomes null in reverse order like the print function works
   if(p == NULL) {
     return;
@@ -135,7 +125,7 @@ void run_prgm(Pgm *p, bool connect_pipe) {
           perror("dup2 error in child");
       }
       // Run the program before execvp since the list of programs are in reverse order
-      run_prgm(p->next, true);
+      run_prgm(p->next, true, NULL);
       
       char** argv = p->pgmlist;
       basic_commands(argv);
@@ -149,6 +139,12 @@ void run_prgm(Pgm *p, bool connect_pipe) {
         if(dup2(fd[PIPE_READ], STDIN_FD) == -1)
           perror("dup2 error in parent");
       }
+
+      // In case get_child_pid isn't null return the pid that we got from the fork
+      if(get_child_pid != NULL) {
+        *get_child_pid = pid;
+      }
+
       int status;
       wait(&status);
     }
