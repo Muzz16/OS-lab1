@@ -189,7 +189,6 @@ void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags, char* rstdout) {
       //   // Change directory or print out an error
         
       // }
-      else { // handles any other command
         if(execvp(argv[0],argv) == -1){
           perror("execvp failed");
           exit(EXIT_FAILURE);
