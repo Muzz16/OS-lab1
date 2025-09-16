@@ -165,6 +165,15 @@ void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags) {
           exit(EXIT_FAILURE);
         }
       }
+
+      if(strcmp(argv[0], "ls") == 0) {
+        if(execvp(argv[0],argv) == -1){
+          perror("execvp failed");
+          exit(EXIT_FAILURE);
+        }
+      }
+
+
     }
     else {
       bool is_background = flags & FLAG_BACKGROUND;
