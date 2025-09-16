@@ -114,8 +114,10 @@ void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags) {
   }
   else {
     char** argv = p->pgmlist;
-    // Call exit to parent
-    if(strcmp(argv[0], "exit") == 0){
+    // Call exit on parent
+    if(strcmp(argv[0], "exit") == 0) {
+      // We should also check in case the argv[1] argument isn't null if they want to exit with a certain exit code
+      // Also exit shouldn't exit in case this command is called "sleep 1 | exit", this should only exit the "sleep 1" child process
       exit(0);
     }
 
@@ -131,11 +133,10 @@ void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags) {
 
     pid_t pid = fork();
 
-    if(pid < 0) {
+    if(pid < 0) { /* ERROR HAPPENED WITH FORK */
       perror("Fork failed!");
     }
-    else if(pid == 0) {
-      // This is the child
+    else if(pid == 0) { /* THIS IS THE CHILD PROCESS */
       if(connect_pipe) {
         close(fd[PIPE_READ]);
         if(dup2(fd[PIPE_WRITE], STDOUT_FD) == -1)
@@ -144,8 +145,6 @@ void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags) {
       // Run the program before execvp since the list of programs are in reverse order
       run_prgm(p->next, NULL, FLAG_CONNECT_PIPE);
       
-      
-
       if(strcmp(argv[0], "cd") == 0) {
         // Do cd stuff
         // Check the standard input for input of directory
@@ -153,14 +152,8 @@ void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags) {
         // Change directory or print out an error
         
       }
-      // else if(strcmp(argv[0], "exit") == 0) {
-      //   // Do exit stuff
-      //   // Send SIGINT signal to parent pid
-
-      //   kill(parent_pid, SIGKILL);
-      // }
       else {
-        if(execvp(argv[0],argv) == -1){
+        if(execvp(argv[0],argv) == -1) {
           perror("execvp failed");
           exit(EXIT_FAILURE);
         }
@@ -168,10 +161,9 @@ void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags) {
 
 
     }
-    else {
+    else { /* THIS IS THE PARENT PROCESS */
       bool is_background = flags & FLAG_BACKGROUND;
 
-      // This is the parent
       // Wait or do something else if it's supposed to be a background process
       if(connect_pipe) {
         close(fd[PIPE_WRITE]);
