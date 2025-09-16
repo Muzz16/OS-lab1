@@ -49,7 +49,7 @@ static void print_cmd(Command *cmd);
 static void print_pgm(Pgm *p);
 void stripwhite(char *);
 void basic_commands(char **argv);
-void run_prgm(Pgm *p, int* get_child_pid, int parent_pid, unsigned char flags);
+void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags);
 void handle_sigint(int sig);
 
 int child_pid;
@@ -82,7 +82,7 @@ int main(void)
         // Just prints cmd
         print_cmd(&cmd);
       
-        run_prgm(cmd.pgm, &child_pid, getpid(), cmd.background ? FLAG_BACKGROUND : FLAG_NONE);
+        run_prgm(cmd.pgm, &child_pid, cmd.background ? FLAG_BACKGROUND : FLAG_NONE);
       }
       else
       {
@@ -107,7 +107,7 @@ int main(void)
  *
  * This function runs in recursion since the order of the programs are in reverse
  */
-void run_prgm(Pgm *p, int* get_child_pid, int parent_pid, unsigned char flags) {
+void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags) {
   // Run until p becomes null in reverse order like the print function works
   if(p == NULL) {
     return;
@@ -136,7 +136,7 @@ void run_prgm(Pgm *p, int* get_child_pid, int parent_pid, unsigned char flags) {
           perror("dup2 error in child");
       }
       // Run the program before execvp since the list of programs are in reverse order
-      run_prgm(p->next, NULL, parent_pid, FLAG_CONNECT_PIPE);
+      run_prgm(p->next, NULL, FLAG_CONNECT_PIPE);
       
       char** argv = p->pgmlist;
 
@@ -149,8 +149,9 @@ void run_prgm(Pgm *p, int* get_child_pid, int parent_pid, unsigned char flags) {
       }
       else if(strcmp(argv[0], "exit") == 0) {
         // Do exit stuff
-        // Propably send SIGINT signal to the shell somehow
-        
+        // Send SIGINT signal to parent pid
+
+        kill(parent_pid, SIGKILL);
       }
       else {
         if(execvp(argv[0],argv) == -1){
