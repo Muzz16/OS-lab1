@@ -115,6 +115,9 @@ void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags) {
   else {
     char** argv = p->pgmlist;
     // Call exit on parent
+    
+    // Doesn't work since the commands we get, we get in reverse order
+    // which means the pipe "sleep 2 | exit" calls this function first before it calls "sleep 2"
     if(strcmp(argv[0], "exit") == 0) {
       // We should also check in case the argv[1] argument isn't null if they want to exit with a certain exit code
       // Also exit shouldn't exit in case this command is called "sleep 1 | exit", this should only exit the "sleep 1" child process
@@ -158,7 +161,7 @@ void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags) {
           exit(EXIT_FAILURE);
         }
       }
-
+      
 
     }
     else { /* THIS IS THE PARENT PROCESS */
