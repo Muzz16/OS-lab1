@@ -124,6 +124,25 @@ void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags) {
       exit(0);
     }
 
+    // Call cd on parent
+    else if(strcmp(argv[0], "cd") == 0){
+      // Check the argument after cd
+      if(argv[1] == NULL){
+        // if no argument has been given
+        fprintf(stderr, "cd: expected an argument");
+      }
+      else{
+        // otherwise we change directory
+        if(chdir(argv[1]) != 0){
+          // if chdir return -1 there is an error
+          perror("cd failed");
+        }
+      }
+      return;
+    }
+
+    
+
     int fd[2];
 
     int parent_pid = getpid();
@@ -148,19 +167,19 @@ void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags) {
       // Run the program before execvp since the list of programs are in reverse order
       run_prgm(p->next, NULL, FLAG_CONNECT_PIPE);
       
-      if(strcmp(argv[0], "cd") == 0) {
-        // Do cd stuff
-        // Check the standard input for input of directory
-        // Check if there is either a standard input or a second argument to this command
-        // Change directory or print out an error
+      // if(strcmp(argv[0], "cd") == 0) {
+      //   // Do cd stuff
+      //   // Check the standard input for input of directory
+      //   // Check if there is either a standard input or a second argument to this command
+      //   // Change directory or print out an error
         
-      }
-      else {
+      // }
+      
         if(execvp(argv[0],argv) == -1) {
           perror("execvp failed");
           exit(EXIT_FAILURE);
         }
-      }
+      
       
 
     }
