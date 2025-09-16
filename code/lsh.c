@@ -31,6 +31,8 @@
 // The <unistd.h> header is your gateway to the OS's process management facilities.
 #include <unistd.h>
 
+#include <fcntl.h> // I assume we need this to actually open files
+
 #include "parse.h"
 
 #define PIPE_READ 0
@@ -49,7 +51,7 @@ static void print_cmd(Command *cmd);
 static void print_pgm(Pgm *p);
 void stripwhite(char *);
 void basic_commands(char **argv);
-void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags);
+void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags, char* rstdout);
 void handle_sigint(int sig);
 
 int child_pid;
@@ -81,8 +83,8 @@ int main(void)
       {
         // Just prints cmd
         print_cmd(&cmd);
-      
-        run_prgm(cmd.pgm, &child_pid, cmd.background ? FLAG_BACKGROUND : FLAG_NONE);
+
+        run_prgm(cmd.pgm, &child_pid, cmd.background ? FLAG_BACKGROUND : FLAG_NONE, cmd.rstdout);
       }
       else
       {
@@ -107,7 +109,7 @@ int main(void)
  *
  * This function runs in recursion since the order of the programs are in reverse
  */
-void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags) {
+void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags, char* rstdout) {
   // Run until p becomes null in reverse order like the print function works
   if(p == NULL) {
     return;
@@ -141,8 +143,21 @@ void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags) {
         if(dup2(fd[PIPE_WRITE], STDOUT_FD) == -1)
           perror("dup2 error in child");
       }
+
+      if(rstdout){ 
+        int descriptor = open(rstdout, O_CREAT | O_RDWR | O_TRUNC, S_IRWXU);
+        if(descriptor == -1){
+          perror("file opening error");
+        } else {
+          if(dup2(descriptor, STDOUT_FD) == -1){
+            perror("dup2 redirection error");
+          }
+        }
+        close(descriptor);
+      }
+
       // Run the program before execvp since the list of programs are in reverse order
-      run_prgm(p->next, NULL, FLAG_CONNECT_PIPE);
+      run_prgm(p->next, NULL, FLAG_CONNECT_PIPE, NULL);
       
       
 
@@ -159,7 +174,7 @@ void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags) {
 
       //   kill(parent_pid, SIGKILL);
       // }
-      else {
+      else { // handles any other command
         if(execvp(argv[0],argv) == -1){
           perror("execvp failed");
           exit(EXIT_FAILURE);
