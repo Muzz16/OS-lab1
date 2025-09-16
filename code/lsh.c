@@ -113,6 +113,12 @@ void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags) {
     return;
   }
   else {
+    char** argv = p->pgmlist;
+    // Call exit to parent
+    if(strcmp(argv[0], "exit") == 0){
+      exit(0);
+    }
+
     int fd[2];
 
     int parent_pid = getpid();
@@ -138,7 +144,7 @@ void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags) {
       // Run the program before execvp since the list of programs are in reverse order
       run_prgm(p->next, NULL, FLAG_CONNECT_PIPE);
       
-      char** argv = p->pgmlist;
+      
 
       if(strcmp(argv[0], "cd") == 0) {
         // Do cd stuff
@@ -147,12 +153,12 @@ void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags) {
         // Change directory or print out an error
         
       }
-      else if(strcmp(argv[0], "exit") == 0) {
-        // Do exit stuff
-        // Send SIGINT signal to parent pid
+      // else if(strcmp(argv[0], "exit") == 0) {
+      //   // Do exit stuff
+      //   // Send SIGINT signal to parent pid
 
-        kill(parent_pid, SIGKILL);
-      }
+      //   kill(parent_pid, SIGKILL);
+      // }
       else {
         if(execvp(argv[0],argv) == -1){
           perror("execvp failed");
