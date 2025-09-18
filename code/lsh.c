@@ -125,7 +125,12 @@ void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags, char* rstdout, ch
     if(strcmp(argv[0], "exit") == 0) {
       // We should also check in case the argv[1] argument isn't null if they want to exit with a certain exit code
       // Also exit shouldn't exit in case this command is called "sleep 1 | exit", this should only exit the "sleep 1" child process
-      exit(0);
+      if(argv[1] == NULL) {
+        exit(0);
+      }
+      else {
+        exit(*argv[1]);
+      }
     }
     // Call cd on parent
     else if(strcmp(argv[0], "cd") == 0){
