@@ -148,13 +148,9 @@ void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags, char* rstdout, ch
     }
 
     
-
     int fd[2];
-
-    int parent_pid = getpid();
     
     bool connect_pipe = flags & FLAG_CONNECT_PIPE;
-
     if(connect_pipe && pipe(fd) == -1) {
       perror("pipe failed");
     }
@@ -165,13 +161,14 @@ void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags, char* rstdout, ch
       perror("Fork failed!");
     }
     else if(pid == 0) { /* THIS IS THE CHILD PROCESS */
-      setpgid(0, 0); // Put child in its own process group
+      setpgid(0, 0); // Put child in its callers process group
       if(connect_pipe) {
         close(fd[PIPE_READ]);
         if(dup2(fd[PIPE_WRITE], STDOUT_FD) == -1)
           perror("dup2 error in child");
       }
-
+      
+      // Check if we have gotten an output redirect
       if(rstdout){ 
         int descriptor = open(rstdout, O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR); // create or open new file
         if(descriptor == -1){
@@ -183,7 +180,8 @@ void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags, char* rstdout, ch
         }
         close(descriptor); // close file
       }
-
+      
+      // Check if we have gotten an input redirect
       if(rstdin){ 
         int descriptor = open(rstdin, O_RDONLY); // create or open new file
         if(descriptor == -1){
@@ -198,16 +196,12 @@ void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags, char* rstdout, ch
 
       // Run the program before execvp since the list of programs are in reverse order
       run_prgm(p->next, NULL, FLAG_CONNECT_PIPE, NULL, NULL);
-      
 
-      // handles any other command
+      // Handles any other command
       if(execvp(argv[0],argv) == -1){
         perror("execvp failed");
         exit(EXIT_FAILURE);
       }
-      
-      
-
     }
     else { /* THIS IS THE PARENT PROCESS */
       bool is_background = flags & FLAG_BACKGROUND;
