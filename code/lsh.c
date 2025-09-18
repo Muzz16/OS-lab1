@@ -51,7 +51,7 @@ static void print_cmd(Command *cmd);
 static void print_pgm(Pgm *p);
 void stripwhite(char *);
 void basic_commands(char **argv);
-void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags, char* rstdout);
+void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags, char* rstdout, char*rstdin);
 void handle_sigint(int sig);
 void handle_sigchld(int sig);
 
@@ -88,7 +88,7 @@ int main(void)
         // Just prints cmd
         print_cmd(&cmd);
 
-        run_prgm(cmd.pgm, &child_pid, cmd.background ? FLAG_BACKGROUND : FLAG_NONE, cmd.rstdout);
+        run_prgm(cmd.pgm, &child_pid, cmd.background ? FLAG_BACKGROUND : FLAG_NONE, cmd.rstdout, cmd.rstdin);
       }
       else
       {
@@ -113,7 +113,7 @@ int main(void)
  *
  * This function runs in recursion since the order of the programs are in reverse
  */
-void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags, char* rstdout) {
+void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags, char* rstdout, char*rstdin) {
   // Run until p becomes null in reverse order like the print function works
   if(p == NULL) {
     return;
@@ -173,7 +173,7 @@ void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags, char* rstdout) {
       }
 
       if(rstdout){ 
-        int descriptor = open(rstdout, O_CREAT | O_RDWR | O_TRUNC, S_IRWXU);
+        int descriptor = open(rstdout, O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR); // create or open new file
         if(descriptor == -1){
           perror("file opening error");
         } else {
@@ -181,23 +181,30 @@ void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags, char* rstdout) {
             perror("dup2 redirection error");
           }
         }
-        close(descriptor);
+        close(descriptor); // close file
+      }
+
+      if(rstdin){ 
+        int descriptor = open(rstdin, O_RDONLY); // create or open new file
+        if(descriptor == -1){
+          perror("file opening error");
+        } else {
+          if(dup2(descriptor, STDIN_FD) == -1){
+            perror("dup2 redirection error");
+          }
+        }
+        close(descriptor); // close file
       }
 
       // Run the program before execvp since the list of programs are in reverse order
-      run_prgm(p->next, NULL, FLAG_CONNECT_PIPE, NULL);
+      run_prgm(p->next, NULL, FLAG_CONNECT_PIPE, NULL, NULL);
       
-      // if(strcmp(argv[0], "cd") == 0) {
-      //   // Do cd stuff
-      //   // Check the standard input for input of directory
-      //   // Check if there is either a standard input or a second argument to this command
-      //   // Change directory or print out an error
-        
-      // }
-        if(execvp(argv[0],argv) == -1){
-          perror("execvp failed");
-          exit(EXIT_FAILURE);
-        }
+
+      // handles any other command
+      if(execvp(argv[0],argv) == -1){
+        perror("execvp failed");
+        exit(EXIT_FAILURE);
+      }
       
       
 
@@ -219,10 +226,8 @@ void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags, char* rstdout) {
         *get_child_pid = pid;
       }
       
-      if(is_background) {
-        
-      }
-      else {
+      // if not background process
+      if(!is_background) {
         int status;
         wait(&status);
       }
