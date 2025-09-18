@@ -122,14 +122,11 @@ void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags, char* rstdout, ch
     char** argv = p->pgmlist;
     // Call exit on parent
     
-    // Doesn't work since the commands we get, we get in reverse order
-    // which means the pipe "sleep 2 | exit" calls this function first before it calls "sleep 2"
     if(strcmp(argv[0], "exit") == 0) {
       // We should also check in case the argv[1] argument isn't null if they want to exit with a certain exit code
       // Also exit shouldn't exit in case this command is called "sleep 1 | exit", this should only exit the "sleep 1" child process
       exit(0);
     }
-
     // Call cd on parent
     else if(strcmp(argv[0], "cd") == 0){
       // Check the argument after cd
@@ -147,7 +144,6 @@ void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags, char* rstdout, ch
       return;
     }
 
-    
     int fd[2];
     
     bool connect_pipe = flags & FLAG_CONNECT_PIPE;
@@ -181,8 +177,8 @@ void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags, char* rstdout, ch
         close(descriptor); // close file
       }
       
-      // Check if we have gotten an input redirect
-      if(rstdin){ 
+      // Check if we have gotten an input redirect and apply it only on the last item which in this case will be the first item written in the program list
+      if(p->next == NULL && rstdin){ 
         int descriptor = open(rstdin, O_RDONLY); // create or open new file
         if(descriptor == -1){
           perror("file opening error");
@@ -195,7 +191,7 @@ void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags, char* rstdout, ch
       }
 
       // Run the program before execvp since the list of programs are in reverse order
-      run_prgm(p->next, NULL, FLAG_CONNECT_PIPE, NULL, NULL);
+      run_prgm(p->next, NULL, FLAG_CONNECT_PIPE, NULL, rstdin);
 
       // Handles any other command
       if(execvp(argv[0],argv) == -1){
