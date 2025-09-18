@@ -53,6 +53,7 @@ void stripwhite(char *);
 void basic_commands(char **argv);
 void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags, char* rstdout);
 void handle_sigint(int sig);
+void handle_sigchld(int sig);
 
 int child_pid;
 
@@ -60,7 +61,8 @@ pid_t foreground_pgid = -1;
 
 int main(void)
 {
-  signal(SIGINT, *handle_sigint);
+  signal(SIGINT, *handle_sigint); // Handle SIGINT (CTRL+C)
+  signal(SIGCHLD, *handle_sigchld); // Handle SIGCHLD to get rid of zombie processes
 
   for (;;)
   {
@@ -232,6 +234,12 @@ void handle_sigint(int sig) {
   printf("\nCTRL+C entered!\n");
   if(foreground_pgid > 0){
     kill(-foreground_pgid, SIGINT); // Send SIGINT to the entire foreground process group
+  }
+}
+
+void handle_sigchld(int sig){
+  if(sig == SIGCHLD){
+    waitpid(-1, NULL, WNOHANG); //clean up all child processes that have finished
   }
 }
 
