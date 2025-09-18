@@ -56,6 +56,8 @@ void handle_sigint(int sig);
 
 int child_pid;
 
+pid_t foreground_pgid = -1;
+
 int main(void)
 {
   signal(SIGINT, *handle_sigint);
@@ -161,6 +163,7 @@ void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags, char* rstdout) {
       perror("Fork failed!");
     }
     else if(pid == 0) { /* THIS IS THE CHILD PROCESS */
+      setpgid(0, 0); // Put child in its own process group
       if(connect_pipe) {
         close(fd[PIPE_READ]);
         if(dup2(fd[PIPE_WRITE], STDOUT_FD) == -1)
@@ -199,7 +202,9 @@ void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags, char* rstdout) {
     }
     else { /* THIS IS THE PARENT PROCESS */
       bool is_background = flags & FLAG_BACKGROUND;
-
+      if(!is_background){
+        foreground_pgid = pid; // This is a foreground process, set the pgid
+      }
       // Wait or do something else if it's supposed to be a background process
       if(connect_pipe) {
         close(fd[PIPE_WRITE]);
@@ -225,7 +230,9 @@ void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags, char* rstdout) {
 
 void handle_sigint(int sig) {
   printf("\nCTRL+C entered!\n");
-  kill(child_pid, SIGINT);
+  if(foreground_pgid > 0){
+    kill(-foreground_pgid, SIGINT); // Send SIGINT to the entire foreground process group
+  }
 }
 
 /*
