@@ -98,10 +98,7 @@ int main(void)
     free(line);
   }
   
-  // Maybe wait for every child process here in case there are ones
-  // Or send a signal to terminate all of them
-
-  wait(NULL);
+  exit(0);
 
   return 0;
 }
@@ -203,10 +200,6 @@ void run_prgm(Pgm *p, unsigned char flags, char* rstdout, char*rstdin) {
       }
     }
     else { /* THIS IS THE PARENT PROCESS */
-      bool is_background = flags & FLAG_BACKGROUND;
-      if(!is_background){
-        foreground_pgid = pid; // This is a foreground process, set the pgid
-      }
       // Wait or do something else if it's supposed to be a background process
       if(connect_pipe) {
         close(fd[PIPE_WRITE]);
@@ -215,7 +208,9 @@ void run_prgm(Pgm *p, unsigned char flags, char* rstdout, char*rstdin) {
       }
 
       // if not background process
+      bool is_background = flags & FLAG_BACKGROUND;
       if(!is_background) {
+        foreground_pgid = pid; // This is a foreground process, set the pgid
         int status;
         wait(&status);
       }
