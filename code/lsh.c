@@ -179,7 +179,7 @@ void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags, char* rstdout, ch
       
       // Check if we have gotten an input redirect and apply it only on the last item which in this case will be the first item written in the program list
       if(p->next == NULL && rstdin){ 
-        int descriptor = open(rstdin, O_RDONLY); // create or open new file
+        int descriptor = open(rstdin, O_RDONLY); // open new file
         if(descriptor == -1){
           perror("file opening error");
         } else {
