@@ -51,11 +51,9 @@ static void print_cmd(Command *cmd);
 static void print_pgm(Pgm *p);
 void stripwhite(char *);
 void basic_commands(char **argv);
-void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags, char* rstdout, char*rstdin);
+void run_prgm(Pgm *p, unsigned char flags, char* rstdout, char*rstdin);
 void handle_sigint(int sig);
 void handle_sigchld(int sig);
-
-int child_pid;
 
 pid_t foreground_pgid = -1;
 
@@ -88,7 +86,7 @@ int main(void)
         // Just prints cmd
         print_cmd(&cmd);
 
-        run_prgm(cmd.pgm, &child_pid, cmd.background ? FLAG_BACKGROUND : FLAG_NONE, cmd.rstdout, cmd.rstdin);
+        run_prgm(cmd.pgm, cmd.background ? FLAG_BACKGROUND : FLAG_NONE, cmd.rstdout, cmd.rstdin);
       }
       else
       {
@@ -113,7 +111,7 @@ int main(void)
  *
  * This function runs in recursion since the order of the programs are in reverse
  */
-void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags, char* rstdout, char*rstdin) {
+void run_prgm(Pgm *p, unsigned char flags, char* rstdout, char*rstdin) {
   // Run until p becomes null in reverse order like the print function works
   if(p == NULL) {
     return;
@@ -125,7 +123,12 @@ void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags, char* rstdout, ch
     if(strcmp(argv[0], "exit") == 0) {
       // We should also check in case the argv[1] argument isn't null if they want to exit with a certain exit code
       // Also exit shouldn't exit in case this command is called "sleep 1 | exit", this should only exit the "sleep 1" child process
-      exit(0);
+      if(argv[1] == NULL) {
+        exit(0);
+      }
+      else {
+        exit(*argv[1]);
+      }
     }
     // Call cd on parent
     else if(strcmp(argv[0], "cd") == 0){
@@ -191,7 +194,7 @@ void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags, char* rstdout, ch
       }
 
       // Run the program before execvp since the list of programs are in reverse order
-      run_prgm(p->next, NULL, FLAG_CONNECT_PIPE, NULL, rstdin);
+      run_prgm(p->next, FLAG_CONNECT_PIPE, NULL, rstdin);
 
       // Handles any other command
       if(execvp(argv[0],argv) == -1){
@@ -211,11 +214,6 @@ void run_prgm(Pgm *p, int* get_child_pid, unsigned char flags, char* rstdout, ch
           perror("dup2 error in parent");
       }
 
-      // In case get_child_pid isn't null return the pid that we got from the fork
-      if(get_child_pid != NULL) {
-        *get_child_pid = pid;
-      }
-      
       // if not background process
       if(!is_background) {
         int status;
