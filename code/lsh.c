@@ -98,10 +98,7 @@ int main(void)
     free(line);
   }
   
-  // Maybe wait for every child process here in case there are ones
-  // Or send a signal to terminate all of them
-
-  wait(NULL);
+  exit(0);
 
   return 0;
 }
@@ -116,109 +113,105 @@ void run_prgm(Pgm *p, unsigned char flags, char* rstdout, char*rstdin) {
   if(p == NULL) {
     return;
   }
-  else {
-    char** argv = p->pgmlist;
-    // Call exit on parent
+  char** argv = p->pgmlist;
+  
+  // Call exit on parent
+  if(strcmp(argv[0], "exit") == 0) {
+    // We should also check in case the argv[1] argument isn't null if they want to exit with a certain exit code
+    // Also exit shouldn't exit in case this command is called "sleep 1 | exit", this should only exit the "sleep 1" child process
+    if(argv[1] == NULL) {
+      exit(0);
+    }
+    else {
+      exit(atoi(argv[1]));
+    }
+  }
+  // Call cd on parent
+  else if(strcmp(argv[0], "cd") == 0){
+    // Check the argument after cd
+    if(argv[1] == NULL){
+      // if no argument has been given
+      fprintf(stderr, "cd: expected an argument");
+    }
+    else{
+      // otherwise we change directory
+      if(chdir(argv[1]) != 0){
+        // if chdir return -1 there is an error
+        perror("cd failed");
+      }
+    }
+    return;
+  }
+
+  int fd[2];
+  
+  bool is_background = flags & FLAG_BACKGROUND;
+  bool connect_pipe = flags & FLAG_CONNECT_PIPE;
+  if(connect_pipe && pipe(fd) == -1) {
+    perror("pipe failed");
+  }
+
+  pid_t pid = fork();
+
+  if(pid < 0) { /* ERROR HAPPENED WITH FORK */
+    perror("Fork failed!");
+  }
+  else if(pid == 0) { /* THIS IS THE CHILD PROCESS */
+    setpgid(0, 0);
+    if(connect_pipe) {
+      close(fd[PIPE_READ]);
+      if(dup2(fd[PIPE_WRITE], STDOUT_FD) == -1)
+        perror("dup2 error in child");
+    }
     
-    if(strcmp(argv[0], "exit") == 0) {
-      // We should also check in case the argv[1] argument isn't null if they want to exit with a certain exit code
-      // Also exit shouldn't exit in case this command is called "sleep 1 | exit", this should only exit the "sleep 1" child process
-      if(argv[1] == NULL) {
-        exit(0);
-      }
-      else {
-        exit(*argv[1]);
-      }
-    }
-    // Call cd on parent
-    else if(strcmp(argv[0], "cd") == 0){
-      // Check the argument after cd
-      if(argv[1] == NULL){
-        // if no argument has been given
-        fprintf(stderr, "cd: expected an argument");
-      }
-      else{
-        // otherwise we change directory
-        if(chdir(argv[1]) != 0){
-          // if chdir return -1 there is an error
-          perror("cd failed");
+    // Check if we have gotten an output redirect
+    if(rstdout){ 
+      int descriptor = open(rstdout, O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR); // create or open new file
+      if(descriptor == -1){
+        perror("file opening error");
+      } else {
+        if(dup2(descriptor, STDOUT_FD) == -1){
+          perror("dup2 redirection error");
         }
       }
-      return;
+      close(descriptor); // close file
     }
-
-    int fd[2];
     
-    bool connect_pipe = flags & FLAG_CONNECT_PIPE;
-    if(connect_pipe && pipe(fd) == -1) {
-      perror("pipe failed");
-    }
-
-    pid_t pid = fork();
-
-    if(pid < 0) { /* ERROR HAPPENED WITH FORK */
-      perror("Fork failed!");
-    }
-    else if(pid == 0) { /* THIS IS THE CHILD PROCESS */
-      setpgid(0, 0); // Put child in its callers process group
-      if(connect_pipe) {
-        close(fd[PIPE_READ]);
-        if(dup2(fd[PIPE_WRITE], STDOUT_FD) == -1)
-          perror("dup2 error in child");
-      }
-      
-      // Check if we have gotten an output redirect
-      if(rstdout){ 
-        int descriptor = open(rstdout, O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR); // create or open new file
-        if(descriptor == -1){
-          perror("file opening error");
-        } else {
-          if(dup2(descriptor, STDOUT_FD) == -1){
-            perror("dup2 redirection error");
-          }
+    // Check if we have gotten an input redirect and apply it only on the last item which in this case will be the first item written in the program list
+    if(p->next == NULL && rstdin){ 
+      int descriptor = open(rstdin, O_RDONLY); // create or open new file
+      if(descriptor == -1){
+        perror("file opening error");
+      } else {
+        if(dup2(descriptor, STDIN_FD) == -1){
+          perror("dup2 redirection error");
         }
-        close(descriptor); // close file
       }
-      
-      // Check if we have gotten an input redirect and apply it only on the last item which in this case will be the first item written in the program list
-      if(p->next == NULL && rstdin){ 
-        int descriptor = open(rstdin, O_RDONLY); // open new file
-        if(descriptor == -1){
-          perror("file opening error");
-        } else {
-          if(dup2(descriptor, STDIN_FD) == -1){
-            perror("dup2 redirection error");
-          }
-        }
-        close(descriptor); // close file
-      }
-
-      // Run the program before execvp since the list of programs are in reverse order
-      run_prgm(p->next, FLAG_CONNECT_PIPE, NULL, rstdin);
-
-      // Handles any other command
-      if(execvp(argv[0],argv) == -1){
-        perror("execvp failed");
-        exit(EXIT_FAILURE);
-      }
+      close(descriptor); // close file
     }
-    else { /* THIS IS THE PARENT PROCESS */
-      bool is_background = flags & FLAG_BACKGROUND;
-      if(!is_background){
-        foreground_pgid = pid; // This is a foreground process, set the pgid
-      }
-      // Wait or do something else if it's supposed to be a background process
-      if(connect_pipe) {
-        close(fd[PIPE_WRITE]);
-        if(dup2(fd[PIPE_READ], STDIN_FD) == -1)
-          perror("dup2 error in parent");
-      }
 
-      // if not background process
-      if(!is_background) {
-        int status;
-        wait(&status);
-      }
+    // Run the program before execvp since the list of programs are in reverse order
+    run_prgm(p->next, FLAG_CONNECT_PIPE, NULL, rstdin);
+
+    // Handles any other command
+    if(execvp(argv[0],argv) == -1){
+      perror("execvp failed");
+      exit(EXIT_FAILURE);
+    }
+  }
+  else { /* THIS IS THE PARENT PROCESS */
+    // Wait or do something else if it's supposed to be a background process
+    if(connect_pipe) {
+      close(fd[PIPE_WRITE]);
+      if(dup2(fd[PIPE_READ], STDIN_FD) == -1)
+        perror("dup2 error in parent");
+    }
+
+    // if not background process
+    if(!is_background) {
+      foreground_pgid = pid; // This is a foreground process, set the pgid
+      int status;
+      wait(&status);
     }
   }
 }
