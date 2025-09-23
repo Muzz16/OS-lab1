@@ -157,6 +157,7 @@ void run_prgm(Pgm *p, unsigned char flags, char* rstdout, char*rstdin) {
     perror("Fork failed!");
   }
   else if(pid == 0) { /* THIS IS THE CHILD PROCESS */
+    setpgid(0, 0);
     if(connect_pipe) {
       close(fd[PIPE_READ]);
       if(dup2(fd[PIPE_WRITE], STDOUT_FD) == -1)
