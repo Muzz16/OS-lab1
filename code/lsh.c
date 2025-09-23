@@ -158,6 +158,8 @@ void run_prgm(Pgm *p, unsigned char flags, char* rstdout, char*rstdin) {
   }
   else if(pid == 0) { /* THIS IS THE CHILD PROCESS */
     setpgid(0, 0);
+    signal(SIGINT, SIG_DFL); // Reset SIGINT to default behavior in child process
+
     if(connect_pipe) {
       close(fd[PIPE_READ]);
       if(dup2(fd[PIPE_WRITE], STDOUT_FD) == -1)
@@ -200,6 +202,7 @@ void run_prgm(Pgm *p, unsigned char flags, char* rstdout, char*rstdin) {
     }
   }
   else { /* THIS IS THE PARENT PROCESS */
+    setpgid(pid, pid); // Set the pgid of the child to its own pid
     // Wait or do something else if it's supposed to be a background process
     if(connect_pipe) {
       close(fd[PIPE_WRITE]);
@@ -212,6 +215,7 @@ void run_prgm(Pgm *p, unsigned char flags, char* rstdout, char*rstdin) {
       foreground_pgid = pid; // This is a foreground process, set the pgid
       int status;
       wait(&status);
+      foreground_pgid = -1; // Reset the foreground pgid
     }
   }
 }
@@ -219,8 +223,8 @@ void run_prgm(Pgm *p, unsigned char flags, char* rstdout, char*rstdin) {
 void handle_sigint(int sig) {
   printf("\nCTRL+C entered!\n");
   if(foreground_pgid > 0){
-    kill(-foreground_pgid, SIGKILL); // Send SIGINT to the entire foreground process group
-  }
+    kill(-foreground_pgid, SIGINT); // Send SIGINT to the entire foreground process group
+  } 
 }
 
 void handle_sigchld(int sig){
