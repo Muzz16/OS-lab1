@@ -145,6 +145,7 @@ void run_prgm(Pgm *p, unsigned char flags, char* rstdout, char*rstdin) {
 
   int fd[2];
   
+  bool is_background = flags & FLAG_BACKGROUND;
   bool connect_pipe = flags & FLAG_CONNECT_PIPE;
   if(connect_pipe && pipe(fd) == -1) {
     perror("pipe failed");
@@ -156,7 +157,6 @@ void run_prgm(Pgm *p, unsigned char flags, char* rstdout, char*rstdin) {
     perror("Fork failed!");
   }
   else if(pid == 0) { /* THIS IS THE CHILD PROCESS */
-    setpgid(0, 0); // Put child in its callers process group
     if(connect_pipe) {
       close(fd[PIPE_READ]);
       if(dup2(fd[PIPE_WRITE], STDOUT_FD) == -1)
@@ -207,7 +207,6 @@ void run_prgm(Pgm *p, unsigned char flags, char* rstdout, char*rstdin) {
     }
 
     // if not background process
-    bool is_background = flags & FLAG_BACKGROUND;
     if(!is_background) {
       foreground_pgid = pid; // This is a foreground process, set the pgid
       int status;
