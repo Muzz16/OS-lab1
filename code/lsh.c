@@ -123,7 +123,7 @@ void run_prgm(Pgm *p, unsigned char flags, char* rstdout, char*rstdin) {
       exit(0);
     }
     else {
-      exit(*argv[1]);
+      exit(atoi(argv[1]));
     }
   }
   // Call cd on parent
