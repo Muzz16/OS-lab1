@@ -224,10 +224,12 @@ void run_prgm(Pgm *p, unsigned char flags, char* rstdout, char*rstdin) {
 }
 
 void handle_sigint(int sig) {
-  printf("\nCTRL+C entered!\n");
-  if(foreground_pgid > 0){
-    kill(-foreground_pgid, SIGINT); // Send SIGINT to the entire foreground process group
-  } 
+  if(sig == SIGINT) {
+    printf("\nCTRL+C entered!\n");
+    if(foreground_pgid > 0){
+      kill(-foreground_pgid, SIGINT); // Send SIGINT to the entire foreground process group
+    } 
+  }
 }
 
 void handle_sigchld(int sig){
