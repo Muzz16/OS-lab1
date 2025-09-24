@@ -45,7 +45,7 @@
 /* FLAGS FOR RUNNING THE PROGRAM */
 #define FLAG_NONE 0
 #define FLAG_BACKGROUND 1
-#define FLAG_CONNECT_PIPE 2
+#define FLAG_IS_PARENT_SHELL 2
 
 static void print_cmd(Command *cmd);
 static void print_pgm(Pgm *p);
@@ -86,7 +86,7 @@ int main(void)
         // Just prints cmd
         print_cmd(&cmd);
 
-        run_prgm(cmd.pgm, cmd.background ? FLAG_BACKGROUND : FLAG_NONE, cmd.rstdout, cmd.rstdin);
+        run_prgm(cmd.pgm, (cmd.background ? FLAG_BACKGROUND : FLAG_NONE) | FLAG_IS_PARENT_SHELL, cmd.rstdout, cmd.rstdin);
       }
       else
       {
@@ -146,7 +146,8 @@ void run_prgm(Pgm *p, unsigned char flags, char* rstdout, char*rstdin) {
   int fd[2];
   
   bool is_background = flags & FLAG_BACKGROUND;
-  bool connect_pipe = flags & FLAG_CONNECT_PIPE;
+  bool is_parent_shell = flags & FLAG_IS_PARENT_SHELL;
+  bool connect_pipe = !is_parent_shell; // We want to connect everything except the lsh shell
   if(connect_pipe && pipe(fd) == -1) {
     perror("pipe failed");
   }
@@ -157,7 +158,6 @@ void run_prgm(Pgm *p, unsigned char flags, char* rstdout, char*rstdin) {
     perror("Fork failed!");
   }
   else if(pid == 0) { /* THIS IS THE CHILD PROCESS */
-    setpgid(0, 0);
     signal(SIGINT, SIG_DFL); // Reset SIGINT to default behavior in child process
 
     if(connect_pipe) {
@@ -193,7 +193,7 @@ void run_prgm(Pgm *p, unsigned char flags, char* rstdout, char*rstdin) {
     }
 
     // Run the program before execvp since the list of programs are in reverse order
-    run_prgm(p->next, FLAG_CONNECT_PIPE, NULL, rstdin);
+    run_prgm(p->next, FLAG_NONE, NULL, rstdin);
 
     // Handles any other command
     if(execvp(argv[0],argv) == -1){
@@ -202,7 +202,10 @@ void run_prgm(Pgm *p, unsigned char flags, char* rstdout, char*rstdin) {
     }
   }
   else { /* THIS IS THE PARENT PROCESS */
-    setpgid(pid, pid); // Set the pgid of the child to its own pid
+    if(is_parent_shell) // Only do this when its the parent shell
+      setpgid(pid, pid); // Set the pgid of the child to its own pid
+    
+
     // Wait or do something else if it's supposed to be a background process
     if(connect_pipe) {
       close(fd[PIPE_WRITE]);
